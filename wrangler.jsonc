@@ -23,8 +23,8 @@
     ],
     "vars": {
         "AUTH_ENABLED": "true",
-        "AUTH_USERNAME": "linuxdo",
-        "AUTH_PASSWORD": "linuxdo",
-        "AUTH_SECRET": "linuxdo"
+        "AUTH_USERNAME": "richardli",
+        "AUTH_PASSWORD": "richardli",
+        "AUTH_SECRET": "richardli"
     }
 }
