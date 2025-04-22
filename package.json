@@ -12,6 +12,7 @@
         "preview": "pnpm run build && vite preview",
         "deploy": "pnpm run build && wrangler deploy",
         "cf-typegen": "wrangler types"
+        
     },
     "dependencies": {
         "@cfworker/jwt": "^7.0.4",
