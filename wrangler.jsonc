@@ -24,7 +24,7 @@
     "vars": {
         "AUTH_ENABLED": "true",
         "AUTH_USERNAME": "richardli",
-        "AUTH_PASSWORD": "richardli",
+        "AUTH_PASSWORD": "adminroot",
         "AUTH_SECRET": "richardli"
     }
 }
