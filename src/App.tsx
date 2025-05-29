@@ -573,10 +573,17 @@ function App() {
         return;
       }
 
-      await api.createGroup(newGroup as Group);
-      await fetchData(); // 重新加载数据
+      const createdGroup = await api.createGroup(newGroup as Group);
+      const newGroupWithSites: GroupWithSites = {
+        id: createdGroup.id as number,
+        name: createdGroup.name,
+        order_num: groups.length, // 确保新分组在末尾
+        sites: [],
+      };
+      setGroups(prevGroups => [...prevGroups, newGroupWithSites]);
       handleCloseAddGroup();
-      setNewGroup({ name: '', order_num: 0 }); // 重置表单
+      setNewGroup({ name: '', order_num: 0 });
+      console.log("新增分组后数据验证：", groups); // 数据一致性验证
     } catch (error) {
       console.error('创建分组失败:', error);
       handleError('创建分组失败: ' + (error as Error).message);
@@ -621,9 +628,21 @@ function App() {
         return;
       }
 
-      await api.createSite(newSite as Site);
-      await fetchData(); // 重新加载数据
+      // 计算新站点的order_num（当前分组站点数）
+      const targetGroup = groups.find(g => g.id === newSite.group_id);
+      const order_num = targetGroup ? targetGroup.sites.length : 0;
+      const siteToCreate = { ...newSite, order_num };
+
+      const createdSite = await api.createSite(siteToCreate as Site);
+      setGroups(prevGroups =>
+        prevGroups.map(group =>
+          group.id === createdSite.group_id
+            ? { ...group, sites: [...group.sites, createdSite] } // 直接追加到站点列表末尾
+            : group
+        )
+      );
       handleCloseAddSite();
+      console.log("新增站点后数据验证：", groups); // 数据一致性验证
     } catch (error) {
       console.error('创建站点失败:', error);
       handleError('创建站点失败: ' + (error as Error).message);
