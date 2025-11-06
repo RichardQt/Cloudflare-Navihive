@@ -106,8 +106,8 @@ const DEFAULT_CONFIGS = {
   'site.title': '导航站',
   'site.name': '导航站',
   'site.customCss': '',
-  'site.backgroundImage': '', // 背景图片URL
-  'site.backgroundOpacity': '0.15', // 背景蒙版透明度
+  'site.backgroundImage': 'https://cfimgbed.richardli.de/file/img/1762401679180_mounton.png', // 背景图片URL
+  'site.backgroundOpacity': '0.45', // 背景蒙版透明度
   'site.iconApi': 'https://www.faviconextractor.com/favicon/{domain}?larger=true', // 默认使用的API接口，带上 ?larger=true 参数可以获取最大尺寸的图标
 };
 
@@ -1027,7 +1027,6 @@ function App() {
           color: 'text.primary',
           transition: 'all 0.3s ease-in-out',
           position: 'relative', // 添加相对定位，作为背景图片的容器
-          overflow: 'hidden', // 防止背景图片溢出
         }}
       >
         {/* 背景图片 */}
@@ -1046,6 +1045,12 @@ function App() {
                 backgroundRepeat: 'no-repeat',
                 backgroundAttachment: 'fixed',
                 zIndex: 0,
+                // 移动端优化：防止滚动时背景抖动
+                '@media (max-width: 600px)': {
+                  position: 'absolute',
+                  minHeight: '100vh',
+                  backgroundAttachment: 'scroll',
+                },
                 '&::before': {
                   content: '""',
                   position: 'absolute',
@@ -1711,7 +1716,7 @@ function App() {
           >
             <Paper
               component='a'
-              href='https://github.com/zqq-nuli/Navihive'
+              href='https://github.com/RichardQt'
               target='_blank'
               rel='noopener noreferrer'
               elevation={2}
