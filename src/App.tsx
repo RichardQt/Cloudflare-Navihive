@@ -6,7 +6,10 @@ import { GroupWithSites } from './types';
 import ThemeToggle from './components/ThemeToggle';
 import GroupCard from './components/GroupCard';
 import LoginForm from './components/LoginForm';
+import LazyBackground from './components/LazyBackground';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import './App.css';
+import { autoFetchFavicon, cleanExpiredIconCache } from './utils/iconCache';
 import {
   DndContext,
   closestCenter,
@@ -327,6 +330,9 @@ function App() {
   useEffect(() => {
     // 检查认证状态
     checkAuthStatus();
+
+    // 清理过期的图标缓存
+    cleanExpiredIconCache().catch(console.error);
 
     // 确保初始化时重置排序状态
     setSortMode(SortMode.None);
@@ -687,6 +693,15 @@ function App() {
 
       const siteToCreate = { ...newSite, order_num: maxOrderNum };
 
+      // 如果没有图标，尝试自动获取
+      if (!siteToCreate.icon && siteToCreate.url) {
+        const iconApi = configs['site.iconApi'] || DEFAULT_CONFIGS['site.iconApi'];
+        const autoIcon = await autoFetchFavicon(siteToCreate.url, iconApi);
+        if (autoIcon) {
+          siteToCreate.icon = autoIcon;
+        }
+      }
+
       const createdSite = await api.createSite(siteToCreate as Site);
       setGroups((prevGroups) =>
         prevGroups.map((group) =>
@@ -1029,46 +1044,13 @@ function App() {
           position: 'relative', // 添加相对定位，作为背景图片的容器
         }}
       >
-        {/* 背景图片 */}
+        {/* 背景图片 - 使用懒加载组件 */}
         {configs['site.backgroundImage'] && (
-          <>
-            <Box
-              sx={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundImage: `url(${configs['site.backgroundImage']})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
-                zIndex: 0,
-                // 移动端优化：防止滚动时背景抖动
-                '@media (max-width: 600px)': {
-                  position: 'absolute',
-                  minHeight: '100vh',
-                  backgroundAttachment: 'scroll',
-                },
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === 'dark'
-                      ? 'rgba(0, 0, 0, ' + (1 - Number(configs['site.backgroundOpacity'])) + ')'
-                      : 'rgba(255, 255, 255, ' +
-                        (1 - Number(configs['site.backgroundOpacity'])) +
-                        ')',
-                  zIndex: 1,
-                },
-              }}
-            />
-          </>
+          <LazyBackground
+            imageUrl={configs['site.backgroundImage']}
+            opacity={Number(configs['site.backgroundOpacity'])}
+            darkMode={darkMode}
+          />
         )}
 
         <Container
@@ -1208,17 +1190,15 @@ function App() {
                       </ListItemIcon>
                       <ListItemText>导入数据</ListItemText>
                     </MenuItem>
-                    {isAuthenticated && (
-                      <>
-                        <Divider />
-                        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                          <ListItemIcon sx={{ color: 'error.main' }}>
-                            <LogoutIcon fontSize='small' />
-                          </ListItemIcon>
-                          <ListItemText>退出登录</ListItemText>
-                        </MenuItem>
-                      </>
-                    )}
+                    {isAuthenticated && [
+                      <Divider key='divider' />,
+                      <MenuItem key='logout' onClick={handleLogout} sx={{ color: 'error.main' }}>
+                        <ListItemIcon sx={{ color: 'error.main' }}>
+                          <LogoutIcon fontSize='small' />
+                        </ListItemIcon>
+                        <ListItemText>退出登录</ListItemText>
+                      </MenuItem>,
+                    ]}
                   </Menu>
                 </>
               )}
@@ -1740,6 +1720,9 @@ function App() {
             </Paper>
           </Box>
         </Container>
+
+        {/* PWA 安装提示 */}
+        <PWAInstallPrompt />
       </Box>
     </ThemeProvider>
   );

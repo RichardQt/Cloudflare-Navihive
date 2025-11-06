@@ -1,15 +1,37 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1976d2" />
-    <meta name="description" content="个人导航站，整理和分享您喜爱的网站链接" />
-    <link rel="icon" href="/vite.svg" />
-    <title>导航站</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <!-- PWA 支持 -->
+  <meta name="theme-color" content="#1976d2" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="NaviHive" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- 应用描述 -->
+  <meta name="description" content="NaviHive - 现代化的网站导航管理系统，整理和分享您喜爱的网站链接" />
+  <meta name="keywords" content="导航站,网站收藏,书签管理,NaviHive" />
+  <meta name="author" content="NaviHive" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- 图标 -->
+  <link rel="icon" href="/vite.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png" />
+
+  <title>导航站</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
