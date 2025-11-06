@@ -201,6 +201,14 @@ export class NavigationClient {
     return response.success;
   }
 
+  async batchSetConfig(configs: Record<string, string>): Promise<boolean> {
+    const response = await this.request('configs/batch', {
+      method: 'PUT',
+      body: JSON.stringify(configs),
+    });
+    return response.success;
+  }
+
   async deleteConfig(key: string): Promise<boolean> {
     const response = await this.request(`configs/${key}`, {
       method: 'DELETE',

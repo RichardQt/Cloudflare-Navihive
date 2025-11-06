@@ -434,8 +434,22 @@ function App() {
   const handleSiteUpdate = async (updatedSite: Site) => {
     try {
       if (updatedSite.id) {
-        await api.updateSite(updatedSite.id, updatedSite);
-        await fetchData(); // 重新加载数据
+        const updated = await api.updateSite(updatedSite.id, updatedSite);
+        if (updated) {
+          // 增量更新：只更新对应的站点
+          setGroups((prevGroups) =>
+            prevGroups.map((group) =>
+              group.id === updated.group_id
+                ? {
+                    ...group,
+                    sites: group.sites.map((site) => (site.id === updated.id ? updated : site)),
+                  }
+                : group
+            )
+          );
+        } else {
+          throw new Error('更新站点返回空结果');
+        }
       }
     } catch (error) {
       console.error('更新站点失败:', error);
@@ -445,10 +459,23 @@ function App() {
 
   // 删除站点
   const handleSiteDelete = async (siteId: number) => {
+    // 保存旧状态用于错误回滚
+    const previousGroups = groups;
+
     try {
+      // 乐观更新：立即从UI中移除
+      setGroups((prevGroups) =>
+        prevGroups.map((group) => ({
+          ...group,
+          sites: group.sites.filter((site) => site.id !== siteId),
+        }))
+      );
+
+      // 调用API删除
       await api.deleteSite(siteId);
-      await fetchData(); // 重新加载数据
     } catch (error) {
+      // 失败时回滚到之前的状态
+      setGroups(previousGroups);
       console.error('删除站点失败:', error);
       handleError('删除站点失败: ' + (error as Error).message);
     }
@@ -469,8 +496,13 @@ function App() {
 
       if (result) {
         console.log('分组排序更新成功');
-        // 重新获取最新数据
-        await fetchData();
+        // 增量更新：只更新本地的 order_num，不需要重新获取数据
+        setGroups((prevGroups) =>
+          prevGroups.map((group, index) => ({
+            ...group,
+            order_num: index,
+          }))
+        );
       } else {
         throw new Error('分组排序更新失败');
       }
@@ -499,8 +531,20 @@ function App() {
 
       if (result) {
         console.log('站点排序更新成功');
-        // 重新获取最新数据
-        await fetchData();
+        // 增量更新：只更新对应分组的站点 order_num
+        setGroups((prevGroups) =>
+          prevGroups.map((group) =>
+            group.id === groupId
+              ? {
+                  ...group,
+                  sites: sites.map((site, index) => ({
+                    ...site,
+                    order_num: index,
+                  })),
+                }
+              : group
+          )
+        );
       } else {
         throw new Error('站点排序更新失败');
       }
@@ -573,17 +617,23 @@ function App() {
         return;
       }
 
-      const createdGroup = await api.createGroup(newGroup as Group);
+      // 计算新分组的 order_num：使用最大值+1，避免删除操作后的重复
+      const maxOrderNum = groups.length > 0 ? Math.max(...groups.map((g) => g.order_num)) + 1 : 0;
+
+      const createdGroup = await api.createGroup({
+        ...newGroup,
+        order_num: maxOrderNum,
+      } as Group);
+
       const newGroupWithSites: GroupWithSites = {
         id: createdGroup.id as number,
         name: createdGroup.name,
-        order_num: groups.length, // 确保新分组在末尾
+        order_num: createdGroup.order_num,
         sites: [],
       };
-      setGroups(prevGroups => [...prevGroups, newGroupWithSites]);
+      setGroups((prevGroups) => [...prevGroups, newGroupWithSites]);
       handleCloseAddGroup();
       setNewGroup({ name: '', order_num: 0 });
-      console.log("新增分组后数据验证：", groups); // 数据一致性验证
     } catch (error) {
       console.error('创建分组失败:', error);
       handleError('创建分组失败: ' + (error as Error).message);
@@ -628,21 +678,24 @@ function App() {
         return;
       }
 
-      // 计算新站点的order_num（当前分组站点数）
-      const targetGroup = groups.find(g => g.id === newSite.group_id);
-      const order_num = targetGroup ? targetGroup.sites.length : 0;
-      const siteToCreate = { ...newSite, order_num };
+      // 计算新站点的 order_num：使用最大值+1，避免删除操作后的重复
+      const targetGroup = groups.find((g) => g.id === newSite.group_id);
+      const maxOrderNum =
+        targetGroup && targetGroup.sites.length > 0
+          ? Math.max(...targetGroup.sites.map((s) => s.order_num)) + 1
+          : 0;
+
+      const siteToCreate = { ...newSite, order_num: maxOrderNum };
 
       const createdSite = await api.createSite(siteToCreate as Site);
-      setGroups(prevGroups =>
-        prevGroups.map(group =>
+      setGroups((prevGroups) =>
+        prevGroups.map((group) =>
           group.id === createdSite.group_id
             ? { ...group, sites: [...group.sites, createdSite] } // 直接追加到站点列表末尾
             : group
         )
       );
       handleCloseAddSite();
-      console.log("新增站点后数据验证：", groups); // 数据一致性验证
     } catch (error) {
       console.error('创建站点失败:', error);
       handleError('创建站点失败: ' + (error as Error).message);
@@ -668,11 +721,17 @@ function App() {
 
   const handleSaveConfig = async () => {
     try {
-      // 保存所有配置
+      // 找出有变化的配置
+      const changedConfigs: Record<string, string> = {};
       for (const [key, value] of Object.entries(tempConfigs)) {
         if (configs[key] !== value) {
-          await api.setConfig(key, value);
+          changedConfigs[key] = value;
         }
+      }
+
+      // 如果有变化的配置，批量更新
+      if (Object.keys(changedConfigs).length > 0) {
+        await api.batchSetConfig(changedConfigs);
       }
 
       // 更新配置状态
@@ -880,8 +939,15 @@ function App() {
   const handleGroupUpdate = async (updatedGroup: Group) => {
     try {
       if (updatedGroup.id) {
-        await api.updateGroup(updatedGroup.id, updatedGroup);
-        await fetchData(); // 重新加载数据
+        const updated = await api.updateGroup(updatedGroup.id, updatedGroup);
+        if (updated) {
+          // 增量更新：只更新对应的分组
+          setGroups((prevGroups) =>
+            prevGroups.map((group) => (group.id === updated.id ? { ...group, ...updated } : group))
+          );
+        } else {
+          throw new Error('更新分组返回空结果');
+        }
       }
     } catch (error) {
       console.error('更新分组失败:', error);
@@ -891,10 +957,18 @@ function App() {
 
   // 删除分组
   const handleGroupDelete = async (groupId: number) => {
+    // 保存旧状态用于错误回滚
+    const previousGroups = groups;
+
     try {
+      // 乐观更新：立即从UI中移除
+      setGroups((prevGroups) => prevGroups.filter((group) => group.id !== groupId));
+
+      // 调用API删除
       await api.deleteGroup(groupId);
-      await fetchData(); // 重新加载数据
     } catch (error) {
+      // 失败时回滚到之前的状态
+      setGroups(previousGroups);
       console.error('删除分组失败:', error);
       handleError('删除分组失败: ' + (error as Error).message);
     }
@@ -961,7 +1035,7 @@ function App() {
           <>
             <Box
               sx={{
-                position: 'absolute',
+                position: 'fixed',
                 top: 0,
                 left: 0,
                 right: 0,
@@ -970,6 +1044,7 @@ function App() {
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
                 zIndex: 0,
                 '&::before': {
                   content: '""',

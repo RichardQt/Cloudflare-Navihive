@@ -311,6 +311,12 @@ export class MockNavigationClient {
     return true;
   }
 
+  async batchSetConfig(configs: Record<string, string>): Promise<boolean> {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    Object.assign(mockConfigs, configs);
+    return true;
+  }
+
   async deleteConfig(key: string): Promise<boolean> {
     await new Promise((resolve) => setTimeout(resolve, 200));
     if (key in mockConfigs) {
