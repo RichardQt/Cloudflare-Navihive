@@ -105,6 +105,9 @@ const mockConfigs: Record<string, string> = {
   'site.title': '我的导航站',
   'site.name': '个人导航',
   'site.customCss': '',
+  'site.backgroundImage': 'https://cfimgbed.richardli.de/file/img/1762401679180_mounton.png',
+  'site.mobileBackgroundImage': 'https://cfimgbed.richardli.de/file/1763088253472_IMG_9429.jpeg',
+  'site.backgroundOpacity': '0.45',
 };
 
 // 模拟API实现

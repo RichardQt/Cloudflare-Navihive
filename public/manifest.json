@@ -3,6 +3,7 @@
   "short_name": "NaviHive",
   "description": "现代化的网站导航管理系统",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1976d2",
@@ -60,19 +61,5 @@
   "categories": [
     "productivity",
     "utilities"
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/screenshots/mobile.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
   ]
 }

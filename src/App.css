@@ -4,6 +4,12 @@
   transition-delay: 0ms;
 }
 
+/* 保持滚动条占位，避免背景在弹层打开时抖动 */
+body {
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
+}
+
 /* 优化拖拽体验 */
 [data-dnd-draggable-context='true'] {
   transition: none !important;

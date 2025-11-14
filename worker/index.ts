@@ -600,7 +600,7 @@ interface ExportedHandler {
 
 // 声明Cloudflare Workers的执行上下文类型
 interface ExecutionContext {
-  waitUntil(promise: Promise<any>): void;
+  waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
 }
 
@@ -612,7 +612,7 @@ interface D1Database {
 }
 
 interface D1PreparedStatement {
-  bind(...values: any[]): D1PreparedStatement;
+  bind(...values: unknown[]): D1PreparedStatement;
   first<T = unknown>(column?: string): Promise<T | null>;
   run<T = unknown>(): Promise<D1Result<T>>;
   all<T = unknown>(): Promise<D1Result<T>>;
@@ -622,5 +622,5 @@ interface D1Result<T = unknown> {
   results?: T[];
   success: boolean;
   error?: string;
-  meta?: any;
+  meta?: Record<string, unknown>;
 }

@@ -55,6 +55,7 @@ import {
   Snackbar,
   InputAdornment,
   Slider,
+  useMediaQuery,
 } from '@mui/material';
 import SortIcon from '@mui/icons-material/Sort';
 import SaveIcon from '@mui/icons-material/Save';
@@ -85,31 +86,13 @@ enum SortMode {
   SiteSort, // 站点排序
 }
 
-// 辅助函数：提取域名
-function extractDomain(url: string): string | null {
-  if (!url) return null;
-
-  try {
-    // 尝试自动添加协议头，如果缺少的话
-    let fullUrl = url;
-    if (!/^https?:\/\//i.test(url)) {
-      fullUrl = 'http://' + url;
-    }
-    const parsedUrl = new URL(fullUrl);
-    return parsedUrl.hostname;
-  } catch {
-    // 尝试备用方法
-    const match = url.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n?]+)/im);
-    return match && match[1] ? match[1] : url;
-  }
-}
-
 // 默认配置
 const DEFAULT_CONFIGS = {
   'site.title': '导航站',
   'site.name': '导航站',
   'site.customCss': '',
   'site.backgroundImage': 'https://cfimgbed.richardli.de/file/img/1762401679180_mounton.png', // 背景图片URL
+  'site.mobileBackgroundImage': '', // 移动端背景图片URL，留空则继承桌面设置
   'site.backgroundOpacity': '0.45', // 背景蒙版透明度
   'site.iconApi': 'https://www.faviconextractor.com/favicon/{domain}?larger=true', // 默认使用的API接口，带上 ?larger=true 参数可以获取最大尺寸的图标
 };
@@ -134,6 +117,8 @@ function App() {
       }),
     [darkMode]
   );
+
+  const isMobileViewport = useMediaQuery('(max-width:768px)');
 
   // 切换主题的回调函数
   const toggleTheme = () => {
@@ -205,6 +190,14 @@ function App() {
   // 错误提示框状态
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const desktopBackgroundImage = configs['site.backgroundImage'];
+  const mobileBackgroundImage = configs['site.mobileBackgroundImage'];
+  const effectiveBackgroundImage =
+    isMobileViewport && mobileBackgroundImage ? mobileBackgroundImage : desktopBackgroundImage;
+  const backgroundOverlayOpacity = Number(
+    configs['site.backgroundOpacity'] ?? DEFAULT_CONFIGS['site.backgroundOpacity']
+  );
   // 导入结果提示框状态
   const [importResultOpen, setImportResultOpen] = useState(false);
   const [importResultMessage, setImportResultMessage] = useState('');
@@ -1045,10 +1038,10 @@ function App() {
         }}
       >
         {/* 背景图片 - 使用懒加载组件 */}
-        {configs['site.backgroundImage'] && (
+        {effectiveBackgroundImage && (
           <LazyBackground
-            imageUrl={configs['site.backgroundImage']}
-            opacity={Number(configs['site.backgroundOpacity'])}
+            imageUrl={effectiveBackgroundImage}
+            opacity={backgroundOverlayOpacity}
             darkMode={darkMode}
           />
         )}
@@ -1161,6 +1154,7 @@ function App() {
                     anchorEl={menuAnchorEl}
                     open={openMenu}
                     onClose={handleMenuClose}
+                    disableScrollLock
                     MenuListProps={{
                       'aria-labelledby': 'navigation-button',
                     }}
@@ -1279,6 +1273,7 @@ function App() {
             onClose={handleCloseAddGroup}
             maxWidth='md'
             fullWidth
+            disableScrollLock
             PaperProps={{
               sx: {
                 m: { xs: 2, sm: 3, md: 4 },
@@ -1333,6 +1328,7 @@ function App() {
             onClose={handleCloseAddSite}
             maxWidth='md'
             fullWidth
+            disableScrollLock
             PaperProps={{
               sx: {
                 m: { xs: 2, sm: 'auto' },
@@ -1406,23 +1402,30 @@ function App() {
                     endAdornment: (
                       <InputAdornment position='end'>
                         <IconButton
-                          onClick={() => {
+                          onClick={async () => {
                             if (!newSite.url) {
                               handleError('请先输入站点URL');
                               return;
                             }
-                            const domain = extractDomain(newSite.url);
-                            if (domain) {
-                              const actualIconApi =
+
+                            try {
+                              const fetchedIcon = await autoFetchFavicon(
+                                newSite.url,
                                 configs['site.iconApi'] ||
-                                'https://www.faviconextractor.com/favicon/{domain}?larger=true';
-                              const iconUrl = actualIconApi.replace('{domain}', domain);
-                              setNewSite({
-                                ...newSite,
-                                icon: iconUrl,
-                              });
-                            } else {
-                              handleError('无法从URL中获取域名');
+                                  'https://www.faviconextractor.com/favicon/{domain}?larger=true'
+                              );
+
+                              if (fetchedIcon) {
+                                setNewSite((prev) => ({
+                                  ...prev,
+                                  icon: fetchedIcon,
+                                }));
+                              } else {
+                                handleError('无法获取网站图标');
+                              }
+                            } catch (error) {
+                              console.error('创建站点时获取图标失败:', error);
+                              handleError('获取图标失败，请稍后重试');
                             }
                           }}
                           edge='end'
@@ -1476,6 +1479,7 @@ function App() {
             onClose={handleCloseConfig}
             maxWidth='sm'
             fullWidth
+            disableScrollLock
             PaperProps={{
               sx: {
                 m: { xs: 2, sm: 3, md: 4 },
@@ -1560,6 +1564,19 @@ function App() {
                     placeholder='https://example.com/background.jpg'
                     helperText='输入图片URL，留空则不使用背景图片'
                   />
+                  <TextField
+                    margin='dense'
+                    id='site-mobile-background-image'
+                    name='site.mobileBackgroundImage'
+                    label='移动端背景图片URL'
+                    type='url'
+                    fullWidth
+                    variant='outlined'
+                    value={tempConfigs['site.mobileBackgroundImage']}
+                    onChange={handleConfigInputChange}
+                    placeholder='https://example.com/mobile-background.jpg'
+                    helperText='可单独设置移动端壁纸，留空则继承桌面背景'
+                  />
 
                   <Box sx={{ mt: 2, mb: 1 }}>
                     <Typography
@@ -1622,6 +1639,7 @@ function App() {
             onClose={handleCloseImport}
             maxWidth='sm'
             fullWidth
+            disableScrollLock
             PaperProps={{
               sx: {
                 m: { xs: 2, sm: 'auto' },

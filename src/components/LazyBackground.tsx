@@ -65,11 +65,11 @@ const LazyBackground: React.FC<LazyBackgroundProps> = ({ imageUrl, opacity, dark
         zIndex: 0,
         opacity: loaded ? 1 : 0,
         transition: 'opacity 0.5s ease-in-out',
-        // 移动端优化：防止滚动时背景抖动
+        pointerEvents: 'none',
+        willChange: 'transform',
         '@media (max-width: 600px)': {
-          position: 'absolute',
-          minHeight: '100vh',
           backgroundAttachment: 'scroll',
+          transform: 'translate3d(0, 0, 0)',
         },
         '&::before': {
           content: '""',

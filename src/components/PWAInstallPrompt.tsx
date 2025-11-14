@@ -3,13 +3,14 @@ import { Snackbar, Alert, Button, Box, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import InstallMobileIcon from '@mui/icons-material/InstallMobile';
 import { isPWAMode } from '../utils/pwa';
+import type { BeforeInstallPromptEvent } from '../types';
 
 /**
  * PWA 安装提示组件
  */
 const PWAInstallPrompt: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     // 如果已经是 PWA 模式，不显示提示
@@ -23,7 +24,7 @@ const PWAInstallPrompt: React.FC = () => {
       return;
     }
 
-    const handler = (e: Event) => {
+    const handler = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
       setDeferredPrompt(e);
 
@@ -46,7 +47,7 @@ const PWAInstallPrompt: React.FC = () => {
     }
 
     // 显示安装提示
-    deferredPrompt.prompt();
+    await deferredPrompt.prompt();
 
     // 等待用户响应
     const { outcome } = await deferredPrompt.userChoice;

@@ -1,9 +1,20 @@
 // PWA Service Worker 注册工具
+import type { BeforeInstallPromptEvent } from '../types';
 
 export interface PWAUpdateCallback {
   onUpdateAvailable?: (registration: ServiceWorkerRegistration) => void;
   onUpdateInstalled?: () => void;
   onOfflineReady?: () => void;
+}
+
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
+
+declare global {
+  interface Window {
+    deferredPrompt?: BeforeInstallPromptEvent | null;
+  }
 }
 
 /**
@@ -126,19 +137,21 @@ export async function getCacheSize(): Promise<number> {
 export function isPWAMode(): boolean {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true
+    ((window.navigator as NavigatorWithStandalone).standalone ?? false)
   );
 }
 
 /**
  * 监听 PWA 安装提示
  */
-export function setupInstallPrompt(onInstallPrompt?: (event: Event) => void): () => void {
-  const handler = (e: Event) => {
+export function setupInstallPrompt(
+  onInstallPrompt?: (event: BeforeInstallPromptEvent) => void
+): () => void {
+  const handler = (e: BeforeInstallPromptEvent) => {
     // 阻止默认的安装提示
     e.preventDefault();
     // 存储事件供后续使用
-    (window as any).deferredPrompt = e;
+    window.deferredPrompt = e;
 
     if (onInstallPrompt) {
       onInstallPrompt(e);
@@ -157,7 +170,7 @@ export function setupInstallPrompt(onInstallPrompt?: (event: Event) => void): ()
  * 显示安装提示
  */
 export async function showInstallPrompt(): Promise<boolean> {
-  const deferredPrompt = (window as any).deferredPrompt;
+  const deferredPrompt = window.deferredPrompt;
 
   if (!deferredPrompt) {
     console.log('没有可用的安装提示');
@@ -165,14 +178,14 @@ export async function showInstallPrompt(): Promise<boolean> {
   }
 
   // 显示安装提示
-  deferredPrompt.prompt();
+  await deferredPrompt.prompt();
 
   // 等待用户响应
   const { outcome } = await deferredPrompt.userChoice;
   console.log(`用户选择: ${outcome}`);
 
   // 清除 prompt
-  (window as any).deferredPrompt = null;
+  window.deferredPrompt = null;
 
   return outcome === 'accepted';
 }

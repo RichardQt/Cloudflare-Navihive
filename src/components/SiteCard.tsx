@@ -119,6 +119,11 @@ const SiteCard = memo(function SiteCard({
           backgroundColor: (theme) =>
             theme.palette.mode === 'dark' ? 'rgba(33, 33, 33, 0.9)' : 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(5px)',
+          ...(!isEditMode && {
+            '&:hover .site-card-settings-btn, &:focus-within .site-card-settings-btn': {
+              opacity: 1,
+            },
+          }),
         }}
       >
         {isEditMode ? (
@@ -305,6 +310,7 @@ const SiteCard = memo(function SiteCard({
 
             {/* 设置按钮 - 移到 CardActionArea 外面避免 button 嵌套 */}
             <IconButton
+              className='site-card-settings-btn'
               size='small'
               sx={{
                 position: 'absolute',
@@ -317,7 +323,7 @@ const SiteCard = memo(function SiteCard({
                 '&:hover': {
                   bgcolor: 'action.selected',
                 },
-                'div:hover &': {
+                '&:focus-visible': {
                   opacity: 1,
                 },
               }}

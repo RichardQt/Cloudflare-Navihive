@@ -143,6 +143,7 @@ export default function SiteSettingsModal({
       onClose={onClose}
       fullWidth
       maxWidth='sm'
+      disableScrollLock
       PaperProps={{
         sx: {
           borderRadius: 2,
@@ -295,6 +296,9 @@ export default function SiteSettingsModal({
                   value={formData.group_id}
                   label='所属分组'
                   onChange={handleSelectChange}
+                  MenuProps={{
+                    disableScrollLock: true,
+                  }}
                 >
                   {groups.map((group) => (
                     <MenuItem key={group.id} value={String(group.id)}>

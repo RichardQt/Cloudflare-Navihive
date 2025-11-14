@@ -142,38 +142,52 @@ export async function getIconWithCache(url: string): Promise<string> {
 
   // 缓存未命中，加载图标
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
+    const tryLoad = (enableAnonymous: boolean) => {
+      const img = new Image();
 
-    img.onload = () => {
-      try {
-        // 创建 canvas 转换为 data URL
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/png');
+      if (enableAnonymous) {
+        img.crossOrigin = 'anonymous';
+      }
 
-          // 缓存图标
-          cacheIcon(url, dataUrl);
-          resolve(dataUrl);
-        } else {
+      img.onload = () => {
+        if (!enableAnonymous) {
+          // 非匿名模式下无法做 canvas 缓存，直接返回 URL
+          resolve(url);
+          return;
+        }
+
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = canvas.toDataURL('image/png');
+            cacheIcon(url, dataUrl);
+            resolve(dataUrl);
+          } else {
+            resolve(url);
+          }
+        } catch (error) {
+          console.warn('图标转换失败，使用原URL:', error);
           resolve(url);
         }
-      } catch (error) {
-        // 如果无法转换（跨域等），直接返回原 URL
-        console.warn('图标转换失败，使用原URL:', error);
-        resolve(url);
-      }
+      };
+
+      img.onerror = () => {
+        if (enableAnonymous) {
+          console.warn('匿名加载图标失败，尝试非跨域模式');
+          tryLoad(false);
+          return;
+        }
+        reject(new Error('图标加载失败'));
+      };
+
+      img.src = url;
     };
 
-    img.onerror = () => {
-      reject(new Error('图标加载失败'));
-    };
-
-    img.src = url;
+    tryLoad(true);
   });
 }
 
@@ -208,16 +222,44 @@ export async function autoFetchFavicon(
     return null;
   }
 
-  const iconUrl = iconApiTemplate.replace('{domain}', domain);
+  const ensureProtocol = (url: string) => {
+    if (!/^https?:\/\//i.test(url)) {
+      return `https://${url}`;
+    }
+    return url;
+  };
 
-  try {
-    // 尝试获取图标（会自动缓存）
-    const cachedIcon = await getIconWithCache(iconUrl);
-    return cachedIcon;
-  } catch (error) {
-    console.error('自动获取 favicon 失败:', error);
-    return null;
+  const normalizedSiteUrl = ensureProtocol(siteUrl);
+  const candidates: string[] = [];
+
+  if (iconApiTemplate) {
+    const hasPlaceholder = iconApiTemplate.includes('{domain}');
+    const templateUrl = hasPlaceholder
+      ? iconApiTemplate.replace('{domain}', domain)
+      : iconApiTemplate;
+    candidates.push(templateUrl);
   }
+
+  candidates.push(`https://${domain}/favicon.ico`);
+  candidates.push(`http://${domain}/favicon.ico`);
+  candidates.push(
+    `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(normalizedSiteUrl)}`
+  );
+
+  const uniqueCandidates = Array.from(new Set(candidates));
+
+  for (const iconUrl of uniqueCandidates) {
+    try {
+      const favicon = await getIconWithCache(iconUrl);
+      if (favicon) {
+        return favicon;
+      }
+    } catch (error) {
+      console.warn(`自动获取 favicon 失败: ${iconUrl}`, error);
+    }
+  }
+
+  return null;
 }
 
 /**
