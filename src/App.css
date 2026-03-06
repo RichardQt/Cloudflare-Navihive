@@ -4,9 +4,14 @@
   transition-delay: 0ms;
 }
 
-/* 保持滚动条占位，避免背景在弹层打开时抖动 */
+html {
+  overflow-x: hidden;
+}
+
+/* 保持滚动条占位，避免背景在弹层打开时抖动；禁止横向滚动 */
 body {
   overflow-y: scroll;
+  overflow-x: hidden;
   scrollbar-gutter: stable both-edges;
 }
 

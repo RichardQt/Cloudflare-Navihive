@@ -73,6 +73,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import ViewCompactIcon from '@mui/icons-material/ViewCompact';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import CommandPalette from './components/CommandPalette';
 
 // 根据环境选择使用真实API还是模拟API
 const isDevEnvironment = import.meta.env.DEV;
@@ -197,6 +198,9 @@ function App() {
 
   // 搜索状态
   const [searchQuery, setSearchQuery] = useState('');
+
+  // 命令面板状态
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // 视图模式状态：default=默认卡片, compact=紧凑小图标
   const [viewMode, setViewMode] = useState<'default' | 'compact'>(() => {
@@ -361,6 +365,18 @@ function App() {
       // 使用默认配置
     }
   };
+
+  // 注册 Ctrl+Shift+K 快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     // 检查认证状态
@@ -1839,6 +1855,13 @@ function App() {
         {/* PWA 安装提示 */}
         <PWAInstallPrompt />
       </Box>
+
+      {/* 命令面板 */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        groups={groups}
+      />
     </ThemeProvider>
   );
 }
