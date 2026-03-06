@@ -195,8 +195,13 @@ export class NavigationAPI {
             };
         }
 
-        // 使用 bcrypt 验证密码
-        const isPasswordValid = compareSync(loginRequest.password, this.passwordHash);
+        // 验证密码：兼容 bcrypt hash 和明文密码
+        const isBcryptHash = this.passwordHash.startsWith('$2a$') || 
+                             this.passwordHash.startsWith('$2b$') || 
+                             this.passwordHash.startsWith('$2y$');
+        const isPasswordValid = isBcryptHash
+            ? compareSync(loginRequest.password, this.passwordHash)
+            : loginRequest.password === this.passwordHash;
 
         if (isPasswordValid) {
             // 生成JWT令牌，传递记住我参数

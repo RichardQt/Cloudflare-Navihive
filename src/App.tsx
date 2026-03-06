@@ -307,9 +307,9 @@ function App() {
       setLoginError(null);
 
       // 调用登录接口
-      const success = await api.login(username, password, rememberMe);
+      const result = await api.login(username, password, rememberMe);
 
-      if (success) {
+      if (result.success) {
         // 登录成功
         setIsAuthenticated(true);
         setIsAuthRequired(false);
