@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# VitePress cache
+.vitepress/cache
+.vitepress/dist
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -29,5 +33,10 @@ dist-ssr
 pnpm-lock.yaml
 npm-lock.yaml
 wrangler.jsonc
-.gitignore
-.github/*
+开发调试.md
+UPDATE.md
+NEXT.md
+
+# VitePress 构建产物
+docs/.vitepress/cache
+docs/.vitepress/dist
