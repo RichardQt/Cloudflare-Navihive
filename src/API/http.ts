@@ -128,9 +128,43 @@ export class NavigationAPI {
     }
 
     // 初始化数据库表
-    // 修改initDB方法，将SQL语句分开执行
+    // 内存缓存：同一个 Worker 实例中避免重复初始化检查
+    private static schemaReady = false;
+
     async initDB(): Promise<{ success: boolean; alreadyInitialized: boolean }> {
-        // 尝试自动修复缺失的字段 (即使已初始化也尝试执行，以修复旧版本数据库)
+        // 同一 Worker 实例中如果已经完成过初始化，直接跳过
+        if (NavigationAPI.schemaReady) {
+            return { success: true, alreadyInitialized: true };
+        }
+
+        // 检查数据库是否已初始化（schema 版本 2 表示包含 is_public 列）
+        try {
+            const schemaVersion = await this.getConfig('SCHEMA_VERSION');
+            if (schemaVersion === '2') {
+                NavigationAPI.schemaReady = true;
+                return { success: true, alreadyInitialized: true };
+            }
+        } catch {
+            // 配置表可能不存在，继续完整初始化
+        }
+
+        // 创建基础表（IF NOT EXISTS 保证幂等）
+        await this.db.exec(
+            `CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, order_num INTEGER NOT NULL, is_public INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
+        );
+
+        await this.db.exec(
+            `CREATE TABLE IF NOT EXISTS sites (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, icon TEXT, description TEXT, notes TEXT, order_num INTEGER NOT NULL, is_public INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE);`
+        );
+
+        await this.db.exec(`CREATE TABLE IF NOT EXISTS configs (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`);
+
+        // 修复旧版数据库：添加缺失的 is_public 列
         try {
             await this.db.exec('ALTER TABLE groups ADD COLUMN is_public INTEGER DEFAULT 1;');
         } catch { }
@@ -142,37 +176,11 @@ export class NavigationAPI {
             await this.db.exec('CREATE INDEX IF NOT EXISTS idx_sites_is_public ON sites(is_public);');
         } catch { }
 
-        // 首先检查数据库是否已初始化
-        try {
-            const isInitialized = await this.getConfig('DB_INITIALIZED');
-            if (isInitialized === 'true') {
-                return { success: true, alreadyInitialized: true };
-            }
-        } catch {
-            // 如果发生错误，可能是配置表不存在，继续初始化
-        }
-
-        // 先创建groups表
-        await this.db.exec(
-            `CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, order_num INTEGER NOT NULL, is_public INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
-        );
-
-        // 再创建sites表
-        await this.db.exec(
-            `CREATE TABLE IF NOT EXISTS sites (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, icon TEXT, description TEXT, notes TEXT, order_num INTEGER NOT NULL, is_public INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE);`
-        );
-
-        // 创建全局配置表
-        await this.db.exec(`CREATE TABLE IF NOT EXISTS configs (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );`);
-
-        // 设置初始化标志
+        // 标记初始化完成并设置 schema 版本
         await this.setConfig('DB_INITIALIZED', 'true');
+        await this.setConfig('SCHEMA_VERSION', '2');
 
+        NavigationAPI.schemaReady = true;
         return { success: true, alreadyInitialized: false };
     }
 

@@ -18,6 +18,9 @@ export default {
       try {
         const api = new NavigationAPI(env);
 
+        // 自动确保数据库 schema 是最新的（幂等操作，不会重复初始化）
+        await api.initDB();
+
         // 登录路由 - 不需要验证
         if (path === 'login' && method === 'POST') {
           const loginData = (await request.json()) as LoginInput;
@@ -407,9 +410,16 @@ export default {
         // 默认返回404
         return new Response('API路径不存在', { status: 404 });
       } catch (error) {
-        // 安全处理错误，不暴露内部细节
-        console.error(`API错误: ${error instanceof Error ? error.message : '未知错误'}`);
-        return new Response(`处理请求时发生错误`, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        const errorStack = error instanceof Error ? error.stack : '';
+        console.error(`API错误 [${method} ${path}]: ${errorMessage}`, errorStack);
+        return Response.json(
+          {
+            success: false,
+            message: `处理请求时发生错误: ${errorMessage}`,
+          },
+          { status: 500 }
+        );
       }
     }
 
@@ -437,6 +447,7 @@ interface LoginInput {
 interface GroupInput {
   name?: string;
   order_num?: number;
+  is_public?: number;
 }
 
 interface SiteInput {
@@ -447,6 +458,7 @@ interface SiteInput {
   description?: string;
   notes?: string;
   order_num?: number;
+  is_public?: number;
 }
 
 interface ConfigInput {
@@ -493,6 +505,12 @@ function validateGroup(data: GroupInput): {
   } else {
     sanitizedData.order_num = data.order_num;
   }
+
+  // is_public 默认为公开
+  sanitizedData.is_public =
+    data.is_public !== undefined && (data.is_public === 0 || data.is_public === 1)
+      ? data.is_public
+      : 1;
 
   return {
     valid: errors.length === 0,
@@ -575,6 +593,12 @@ function validateSite(data: SiteInput): {
   } else {
     sanitizedData.order_num = data.order_num;
   }
+
+  // is_public 默认为公开
+  sanitizedData.is_public =
+    data.is_public !== undefined && (data.is_public === 0 || data.is_public === 1)
+      ? data.is_public
+      : 1;
 
   return {
     valid: errors.length === 0,
