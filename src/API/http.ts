@@ -680,6 +680,29 @@ export class NavigationAPI {
         }
     }
 
+    async batchSetConfig(configs: Record<string, string>): Promise<boolean> {
+        try {
+            const statements = Object.entries(configs).map(([key, value]) =>
+                this.db
+                    .prepare(
+                        `INSERT INTO configs (key, value, updated_at) 
+                        VALUES (?, ?, CURRENT_TIMESTAMP) 
+                        ON CONFLICT(key) 
+                        DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP`
+                    )
+                    .bind(key, value, value)
+            );
+
+            if (statements.length === 0) return true;
+
+            const results = await this.db.batch(statements);
+            return results.every((r) => r.success);
+        } catch (error) {
+            console.error('批量设置配置失败:', error);
+            return false;
+        }
+    }
+
     async deleteConfig(key: string): Promise<boolean> {
         const result = await this.db.prepare('DELETE FROM configs WHERE key = ?').bind(key).run();
 
