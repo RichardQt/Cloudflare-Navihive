@@ -24,7 +24,8 @@ interface SiteCardProps {
   onDelete: (siteId: number) => void;
   isEditMode?: boolean;
   index?: number;
-  iconApi?: string; // 添加iconApi属性
+  iconApi?: string;
+  compact?: boolean;
 }
 
 // 使用memo包装组件以减少不必要的重渲染
@@ -34,7 +35,8 @@ const SiteCard = memo(function SiteCard({
   onDelete,
   isEditMode = false,
   index = 0,
-  iconApi, // 添加iconApi参数
+  iconApi,
+  compact = false,
 }: SiteCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [iconError, setIconError] = useState(!site.icon);
@@ -86,7 +88,120 @@ const SiteCard = memo(function SiteCard({
     setImageLoaded(true);
   };
 
-  // 卡片内容
+  const iconSize = compact ? 20 : 32;
+
+  // 紧凑模式卡片
+  const compactCardContent = (
+    <Box
+      sx={{
+        height: '100%',
+        position: 'relative',
+      }}
+    >
+      <Card
+        sx={{
+          height: '100%',
+          display: 'flex',
+          borderRadius: 2,
+          transition: 'box-shadow 0.2s ease-in-out',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 1,
+          '&:hover': {
+            boxShadow: 3,
+            '& .site-card-settings-btn': { opacity: 1 },
+          },
+          overflow: 'hidden',
+          backgroundColor: (theme) =>
+            theme.palette.mode === 'dark' ? 'rgba(33, 33, 33, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+        }}
+      >
+        <CardActionArea onClick={handleCardClick} sx={{ height: '100%' }}>
+          <CardContent
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              p: '6px 10px !important',
+              gap: 1,
+            }}
+          >
+            {!iconError && site.icon ? (
+              <Box position='relative' width={iconSize} height={iconSize} flexShrink={0}>
+                <Skeleton
+                  variant='rounded'
+                  width={iconSize}
+                  height={iconSize}
+                  sx={{ display: !imageLoaded ? 'block' : 'none', position: 'absolute' }}
+                />
+                <Fade in={imageLoaded} timeout={500}>
+                  <Box
+                    component='img'
+                    src={site.icon}
+                    alt={site.name}
+                    sx={{ width: iconSize, height: iconSize, borderRadius: 0.5, objectFit: 'cover' }}
+                    onError={handleIconError}
+                    onLoad={handleImageLoad}
+                  />
+                </Fade>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  width: iconSize,
+                  height: iconSize,
+                  borderRadius: 0.5,
+                  bgcolor: 'primary.light',
+                  color: 'primary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  border: 1,
+                  borderColor: 'primary.main',
+                  opacity: 0.8,
+                  flexShrink: 0,
+                }}
+              >
+                {fallbackIcon}
+              </Box>
+            )}
+            <Typography
+              variant='body2'
+              fontWeight='medium'
+              noWrap
+              sx={{ fontSize: '0.8rem', lineHeight: 1.2 }}
+            >
+              {site.name}
+            </Typography>
+          </CardContent>
+        </CardActionArea>
+
+        <IconButton
+          className='site-card-settings-btn'
+          size='small'
+          sx={{
+            position: 'absolute',
+            top: 2,
+            right: 2,
+            bgcolor: 'action.hover',
+            opacity: 0,
+            transition: 'opacity 0.2s',
+            zIndex: 1,
+            p: 0.25,
+            '&:hover': { bgcolor: 'action.selected' },
+            '&:focus-visible': { opacity: 1 },
+          }}
+          onClick={handleSettingsClick}
+          aria-label='网站设置'
+        >
+          <SettingsIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+      </Card>
+    </Box>
+  );
+
+  // 默认模式卡片
   const cardContent = (
     <Box
       sx={{
@@ -139,14 +254,13 @@ const SiteCard = memo(function SiteCard({
             <Box position='absolute' top={8} right={8}>
               <DragIndicatorIcon fontSize='small' color='primary' />
             </Box>
-            {/* 图标和名称 */}
             <Box display='flex' alignItems='center' mb={1}>
               {!iconError && site.icon ? (
-                <Box position='relative' mr={1.5} width={32} height={32} flexShrink={0}>
+                <Box position='relative' mr={1.5} width={iconSize} height={iconSize} flexShrink={0}>
                   <Skeleton
                     variant='rounded'
-                    width={32}
-                    height={32}
+                    width={iconSize}
+                    height={iconSize}
                     sx={{
                       display: !imageLoaded ? 'block' : 'none',
                       position: 'absolute',
@@ -158,8 +272,8 @@ const SiteCard = memo(function SiteCard({
                       src={site.icon}
                       alt={site.name}
                       sx={{
-                        width: 32,
-                        height: 32,
+                        width: iconSize,
+                        height: iconSize,
                         borderRadius: 1,
                         objectFit: 'cover',
                       }}
@@ -171,8 +285,8 @@ const SiteCard = memo(function SiteCard({
               ) : (
                 <Box
                   sx={{
-                    width: 32,
-                    height: 32,
+                    width: iconSize,
+                    height: iconSize,
                     mr: 1.5,
                     borderRadius: 1,
                     bgcolor: 'primary.light',
@@ -200,7 +314,6 @@ const SiteCard = memo(function SiteCard({
               </Typography>
             </Box>
 
-            {/* 描述 */}
             <Typography
               variant='body2'
               color='text.secondary'
@@ -229,14 +342,13 @@ const SiteCard = memo(function SiteCard({
                   '&:last-child': { pb: { xs: 1.5, sm: 2 } },
                 }}
               >
-                {/* 图标和名称 */}
                 <Box display='flex' alignItems='center' mb={1}>
                   {!iconError && site.icon ? (
-                    <Box position='relative' mr={1.5} width={32} height={32} flexShrink={0}>
+                    <Box position='relative' mr={1.5} width={iconSize} height={iconSize} flexShrink={0}>
                       <Skeleton
                         variant='rounded'
-                        width={32}
-                        height={32}
+                        width={iconSize}
+                        height={iconSize}
                         sx={{
                           display: !imageLoaded ? 'block' : 'none',
                           position: 'absolute',
@@ -248,8 +360,8 @@ const SiteCard = memo(function SiteCard({
                           src={site.icon}
                           alt={site.name}
                           sx={{
-                            width: 32,
-                            height: 32,
+                            width: iconSize,
+                            height: iconSize,
                             borderRadius: 1,
                             objectFit: 'cover',
                           }}
@@ -261,8 +373,8 @@ const SiteCard = memo(function SiteCard({
                   ) : (
                     <Box
                       sx={{
-                        width: 32,
-                        height: 32,
+                        width: iconSize,
+                        height: iconSize,
                         mr: 1.5,
                         borderRadius: 1,
                         bgcolor: 'primary.light',
@@ -290,7 +402,6 @@ const SiteCard = memo(function SiteCard({
                   </Typography>
                 </Box>
 
-                {/* 描述 */}
                 <Typography
                   variant='body2'
                   color='text.secondary'
@@ -308,7 +419,6 @@ const SiteCard = memo(function SiteCard({
               </CardContent>
             </CardActionArea>
 
-            {/* 设置按钮 - 移到 CardActionArea 外面避免 button 嵌套 */}
             <IconButton
               className='site-card-settings-btn'
               size='small'
@@ -338,11 +448,13 @@ const SiteCard = memo(function SiteCard({
     </Box>
   );
 
+  const activeContent = compact && !isEditMode ? compactCardContent : cardContent;
+
   if (isEditMode) {
     return (
       <>
         <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-          {cardContent}
+          {activeContent}
         </div>
 
         {showSettings && (
@@ -351,7 +463,7 @@ const SiteCard = memo(function SiteCard({
             onUpdate={onUpdate}
             onDelete={onDelete}
             onClose={handleCloseSettings}
-            iconApi={iconApi} // 传递iconApi给SiteSettingsModal
+            iconApi={iconApi}
           />
         )}
       </>
@@ -360,7 +472,7 @@ const SiteCard = memo(function SiteCard({
 
   return (
     <>
-      {cardContent}
+      {activeContent}
 
       {showSettings && (
         <SiteSettingsModal
@@ -368,7 +480,7 @@ const SiteCard = memo(function SiteCard({
           onUpdate={onUpdate}
           onDelete={onDelete}
           onClose={handleCloseSettings}
-          iconApi={iconApi} // 传递iconApi给SiteSettingsModal
+          iconApi={iconApi}
         />
       )}
     </>

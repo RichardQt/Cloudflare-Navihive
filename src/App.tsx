@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { NavigationClient } from './API/client';
 import { MockNavigationClient } from './API/mock';
 import { Site, Group } from './API/http';
@@ -69,6 +69,10 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import ViewCompactIcon from '@mui/icons-material/ViewCompact';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 
 // 根据环境选择使用真实API还是模拟API
 const isDevEnvironment = import.meta.env.DEV;
@@ -190,6 +194,44 @@ function App() {
   // 错误提示框状态
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // 搜索状态
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 视图模式状态：default=默认卡片, compact=紧凑小图标
+  const [viewMode, setViewMode] = useState<'default' | 'compact'>(() => {
+    const saved = localStorage.getItem('viewMode');
+    return saved === 'compact' ? 'compact' : 'default';
+  });
+
+  const toggleViewMode = () => {
+    const next = viewMode === 'default' ? 'compact' : 'default';
+    setViewMode(next);
+    localStorage.setItem('viewMode', next);
+    handleMenuClose();
+  };
+
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groups;
+
+    return groups
+      .map((group) => {
+        const groupNameMatch = group.name.toLowerCase().includes(q);
+        const matchedSites = group.sites.filter(
+          (site) =>
+            site.name.toLowerCase().includes(q) ||
+            site.url.toLowerCase().includes(q) ||
+            site.description?.toLowerCase().includes(q) ||
+            site.notes?.toLowerCase().includes(q)
+        );
+
+        if (groupNameMatch) return group;
+        if (matchedSites.length > 0) return { ...group, sites: matchedSites };
+        return null;
+      })
+      .filter(Boolean) as GroupWithSites[];
+  }, [groups, searchQuery]);
 
   const desktopBackgroundImage = configs['site.backgroundImage'];
   const mobileBackgroundImage = configs['site.mobileBackgroundImage'];
@@ -430,12 +472,11 @@ function App() {
   };
 
   // 更新站点
-  const handleSiteUpdate = async (updatedSite: Site) => {
+  const handleSiteUpdate = useCallback(async (updatedSite: Site) => {
     try {
       if (updatedSite.id) {
         const updated = await api.updateSite(updatedSite.id, updatedSite);
         if (updated) {
-          // 增量更新：只更新对应的站点
           setGroups((prevGroups) =>
             prevGroups.map((group) =>
               group.id === updated.group_id
@@ -454,31 +495,27 @@ function App() {
       console.error('更新站点失败:', error);
       handleError('更新站点失败: ' + (error as Error).message);
     }
-  };
+  }, []);
 
   // 删除站点
-  const handleSiteDelete = async (siteId: number) => {
-    // 保存旧状态用于错误回滚
-    const previousGroups = groups;
+  const handleSiteDelete = useCallback(async (siteId: number) => {
+    let previousGroups: GroupWithSites[] = [];
+    setGroups((prevGroups) => {
+      previousGroups = prevGroups;
+      return prevGroups.map((group) => ({
+        ...group,
+        sites: group.sites.filter((site) => site.id !== siteId),
+      }));
+    });
 
     try {
-      // 乐观更新：立即从UI中移除
-      setGroups((prevGroups) =>
-        prevGroups.map((group) => ({
-          ...group,
-          sites: group.sites.filter((site) => site.id !== siteId),
-        }))
-      );
-
-      // 调用API删除
       await api.deleteSite(siteId);
     } catch (error) {
-      // 失败时回滚到之前的状态
       setGroups(previousGroups);
       console.error('删除站点失败:', error);
       handleError('删除站点失败: ' + (error as Error).message);
     }
-  };
+  }, []);
 
   // 保存分组排序
   const handleSaveGroupOrder = async () => {
@@ -515,22 +552,16 @@ function App() {
   };
 
   // 保存站点排序
-  const handleSaveSiteOrder = async (groupId: number, sites: Site[]) => {
+  const handleSaveSiteOrder = useCallback(async (groupId: number, sites: Site[]) => {
     try {
-      console.log('保存站点排序', groupId, sites);
-
-      // 构造需要更新的站点顺序数据
       const siteOrders = sites.map((site, index) => ({
         id: site.id as number,
         order_num: index,
       }));
 
-      // 调用API更新站点顺序
       const result = await api.updateSiteOrder(siteOrders);
 
       if (result) {
-        console.log('站点排序更新成功');
-        // 增量更新：只更新对应分组的站点 order_num
         setGroups((prevGroups) =>
           prevGroups.map((group) =>
             group.id === groupId
@@ -554,7 +585,7 @@ function App() {
       console.error('更新站点排序失败:', error);
       handleError('更新站点排序失败: ' + (error as Error).message);
     }
-  };
+  }, []);
 
   // 启动分组排序
   const startGroupSort = () => {
@@ -564,11 +595,10 @@ function App() {
   };
 
   // 启动站点排序
-  const startSiteSort = (groupId: number) => {
-    console.log('开始站点排序');
+  const startSiteSort = useCallback((groupId: number) => {
     setSortMode(SortMode.SiteSort);
     setCurrentSortingGroupId(groupId);
-  };
+  }, []);
 
   // 取消排序
   const cancelSort = () => {
@@ -640,7 +670,7 @@ function App() {
   };
 
   // 新增站点相关函数
-  const handleOpenAddSite = (groupId: number) => {
+  const handleOpenAddSite = useCallback((groupId: number) => {
     const group = groups.find((g) => g.id === groupId);
     const maxOrderNum = group?.sites.length
       ? Math.max(...group.sites.map((s) => s.order_num)) + 1
@@ -657,7 +687,7 @@ function App() {
     });
 
     setOpenAddSite(true);
-  };
+  }, [groups]);
 
   const handleCloseAddSite = () => {
     setOpenAddSite(false);
@@ -913,6 +943,42 @@ function App() {
     );
   };
 
+  // 更新分组
+  const handleGroupUpdate = useCallback(async (updatedGroup: Group) => {
+    try {
+      if (updatedGroup.id) {
+        const updated = await api.updateGroup(updatedGroup.id, updatedGroup);
+        if (updated) {
+          setGroups((prevGroups) =>
+            prevGroups.map((group) => (group.id === updated.id ? { ...group, ...updated } : group))
+          );
+        } else {
+          throw new Error('更新分组返回空结果');
+        }
+      }
+    } catch (error) {
+      console.error('更新分组失败:', error);
+      handleError('更新分组失败: ' + (error as Error).message);
+    }
+  }, []);
+
+  // 删除分组
+  const handleGroupDelete = useCallback(async (groupId: number) => {
+    let previousGroups: GroupWithSites[] = [];
+    setGroups((prevGroups) => {
+      previousGroups = prevGroups;
+      return prevGroups.filter((group) => group.id !== groupId);
+    });
+
+    try {
+      await api.deleteGroup(groupId);
+    } catch (error) {
+      setGroups(previousGroups);
+      console.error('删除分组失败:', error);
+      handleError('删除分组失败: ' + (error as Error).message);
+    }
+  }, []);
+
   // 如果正在检查认证状态，显示加载界面
   if (isAuthChecking) {
     return (
@@ -942,45 +1008,6 @@ function App() {
       </ThemeProvider>
     );
   }
-
-  // 更新分组
-  const handleGroupUpdate = async (updatedGroup: Group) => {
-    try {
-      if (updatedGroup.id) {
-        const updated = await api.updateGroup(updatedGroup.id, updatedGroup);
-        if (updated) {
-          // 增量更新：只更新对应的分组
-          setGroups((prevGroups) =>
-            prevGroups.map((group) => (group.id === updated.id ? { ...group, ...updated } : group))
-          );
-        } else {
-          throw new Error('更新分组返回空结果');
-        }
-      }
-    } catch (error) {
-      console.error('更新分组失败:', error);
-      handleError('更新分组失败: ' + (error as Error).message);
-    }
-  };
-
-  // 删除分组
-  const handleGroupDelete = async (groupId: number) => {
-    // 保存旧状态用于错误回滚
-    const previousGroups = groups;
-
-    try {
-      // 乐观更新：立即从UI中移除
-      setGroups((prevGroups) => prevGroups.filter((group) => group.id !== groupId));
-
-      // 调用API删除
-      await api.deleteGroup(groupId);
-    } catch (error) {
-      // 失败时回滚到之前的状态
-      setGroups(previousGroups);
-      console.error('删除分组失败:', error);
-      handleError('删除分组失败: ' + (error as Error).message);
-    }
-  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -1119,6 +1146,54 @@ function App() {
                 </>
               ) : (
                 <>
+                  <TextField
+                    size='small'
+                    placeholder='搜索...'
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position='start'>
+                          <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: searchQuery ? (
+                        <InputAdornment position='end'>
+                          <IconButton size='small' onClick={() => setSearchQuery('')} sx={{ p: 0.25 }}>
+                            <ClearIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                    sx={{
+                      width: { xs: '100%', sm: 180 },
+                      order: { xs: 1, sm: 0 },
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        height: 34,
+                        bgcolor: (theme) =>
+                          theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.06)'
+                            : 'rgba(255,255,255,0.8)',
+                        backdropFilter: 'blur(8px)',
+                        transition: 'box-shadow 0.2s, width 0.2s',
+                        '&:hover': {
+                          bgcolor: (theme) =>
+                            theme.palette.mode === 'dark'
+                              ? 'rgba(255,255,255,0.09)'
+                              : 'rgba(255,255,255,0.95)',
+                        },
+                        '&.Mui-focused': {
+                          boxShadow: (theme) =>
+                            `0 0 0 2px ${theme.palette.primary.main}40`,
+                        },
+                      },
+                      '& .MuiOutlinedInput-input': {
+                        py: 0.5,
+                        fontSize: '0.875rem',
+                      },
+                    }}
+                  />
                   <Button
                     variant='contained'
                     color='primary'
@@ -1159,6 +1234,18 @@ function App() {
                       'aria-labelledby': 'navigation-button',
                     }}
                   >
+                    <MenuItem onClick={toggleViewMode}>
+                      <ListItemIcon>
+                        {viewMode === 'default' ? (
+                          <ViewCompactIcon fontSize='small' />
+                        ) : (
+                          <ViewModuleIcon fontSize='small' />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText>
+                        {viewMode === 'default' ? '紧凑视图' : '默认视图'}
+                      </ListItemText>
+                    </MenuItem>
                     <MenuItem onClick={startGroupSort}>
                       <ListItemIcon>
                         <SortIcon fontSize='small' />
@@ -1227,7 +1314,7 @@ function App() {
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={groups.map((group) => group.id.toString())}
+                    items={filteredGroups.map((group) => group.id.toString())}
                     strategy={verticalListSortingStrategy}
                   >
                     <Stack
@@ -1238,7 +1325,7 @@ function App() {
                         },
                       }}
                     >
-                      {groups.map((group) => (
+                      {filteredGroups.map((group) => (
                         <SortableGroupItem key={group.id} id={group.id.toString()} group={group} />
                       ))}
                     </Stack>
@@ -1246,22 +1333,32 @@ function App() {
                 </DndContext>
               ) : (
                 <Stack spacing={5}>
-                  {groups.map((group) => (
-                    <GroupCard
-                      key={`group-${group.id}`}
-                      group={group}
-                      sortMode={sortMode === SortMode.None ? 'None' : 'SiteSort'}
-                      currentSortingGroupId={currentSortingGroupId}
-                      onUpdate={handleSiteUpdate}
-                      onDelete={handleSiteDelete}
-                      onSaveSiteOrder={handleSaveSiteOrder}
-                      onStartSiteSort={startSiteSort}
-                      onAddSite={handleOpenAddSite}
-                      onUpdateGroup={handleGroupUpdate}
-                      onDeleteGroup={handleGroupDelete}
-                      configs={configs}
-                    />
-                  ))}
+                  {filteredGroups.length === 0 && searchQuery.trim() ? (
+                    <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+                      <SearchIcon sx={{ fontSize: 48, mb: 1, opacity: 0.4 }} />
+                      <Typography variant='body1'>
+                        没有找到与 "{searchQuery.trim()}" 相关的结果
+                      </Typography>
+                    </Box>
+                  ) : (
+                    filteredGroups.map((group) => (
+                      <GroupCard
+                        key={`group-${group.id}`}
+                        group={group}
+                        sortMode={sortMode === SortMode.None ? 'None' : 'SiteSort'}
+                        currentSortingGroupId={currentSortingGroupId}
+                        onUpdate={handleSiteUpdate}
+                        onDelete={handleSiteDelete}
+                        onSaveSiteOrder={handleSaveSiteOrder}
+                        onStartSiteSort={startSiteSort}
+                        onAddSite={handleOpenAddSite}
+                        onUpdateGroup={handleGroupUpdate}
+                        onDeleteGroup={handleGroupDelete}
+                        configs={configs}
+                        viewMode={viewMode}
+                      />
+                    ))
+                  )}
                 </Stack>
               )}
             </Box>
