@@ -108,7 +108,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onClose, groups }
         });
       } else if (e.key === 'Enter' && results.length > 0) {
         e.preventDefault();
-        openSite(results[selectedIndex].url);
+        openSite(results[selectedIndex].site.url);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
